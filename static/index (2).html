@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Deriv Chart</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2>Gráfico Deriv ao Vivo</h2>
+  <select id="symbolSelect">
+    <option value="R_50">R_50</option>
+    <option value="R_100">R_100</option>
+  </select>
+  <canvas id="chart" width="800" height="400"></canvas>
+  <a id="jsonLink" href="#"><button>Exportar JSON</button></a>
+  <a id="csvLink" href="#"><button>Exportar CSV</button></a>
+
+  <script>
+    const ctx = document.getElementById("chart").getContext("2d");
+    let chart, labels = [], data = [];
+
+    function updateExportLinks(symbol) {
+      document.getElementById("jsonLink").href = `/export/${symbol}/json`;
+      document.getElementById("csvLink").href = `/export/${symbol}/csv`;
+    }
+
+    function connect(symbol) {
+      if (chart) chart.destroy();
+      labels = [], data = [];
+      updateExportLinks(symbol);
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: `${symbol} - Fechamento`,
+            data,
+            borderColor: 'cyan',
+            backgroundColor: 'rgba(0,255,255,0.1)'
+          }]
+        }
+      });
+
+      const protocol = location.protocol === "https:" ? "wss" : "ws";
+      const socket = new WebSocket(`${protocol}://${location.host}/?symbol=${symbol}`);
+
+      socket.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "candle") {
+          labels.push(new Date(msg.data.epoch * 1000).toLocaleTimeString());
+          data.push(msg.data.close);
+          if (labels.length > 20) {
+            labels.shift(); data.shift();
+          }
+          chart.update();
+        }
+      };
+    }
+
+    document.getElementById("symbolSelect").addEventListener("change", e => {
+      connect(e.target.value);
+    });
+
+    connect("R_50");
+  </script>
+</body>
+</html>
